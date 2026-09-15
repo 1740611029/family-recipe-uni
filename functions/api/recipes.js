@@ -1,17 +1,27 @@
 /**
  * GET /api/recipes
  * 获取所有菜谱列表（公开，无需鉴权）
+ * 今日推荐（recommendDate = 今天）的菜谱置顶
  * 对应原 uniCloud 云函数 getRecipes
  */
 
-import { json, rowToRecipe } from '../utils.js'
+import { json, rowToRecipe, getDateStr } from '../utils.js'
 
 export async function onRequestGet(context) {
   const { env } = context
 
   try {
+    const today = getDateStr()
+    // 推荐置顶：recommendDate = today 的排前面，再按 createTime 倒序
     const result = await env.DB
-      .prepare('SELECT * FROM recipes ORDER BY createTime DESC LIMIT 200')
+      .prepare(`
+        SELECT * FROM recipes
+        ORDER BY
+          CASE WHEN recommendDate = ? THEN 0 ELSE 1 END,
+          createTime DESC
+        LIMIT 200
+      `)
+      .bind(today)
       .all()
 
     const data = (result.results || []).map(rowToRecipe)

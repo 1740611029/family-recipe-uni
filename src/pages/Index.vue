@@ -95,6 +95,7 @@ import { ref, onMounted, onActivated, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import recipeApi from '../utils/recipe.js'
 import recommendUtil from '../utils/recommend.js'
+import auth from '../utils/auth.js'
 import { ui } from '../utils/ui.js'
 
 const router = useRouter()
@@ -117,57 +118,21 @@ function onPressEnd() {
 }
 
 /**
- * 应用"今日推荐"到列表
+ * 标记"今日推荐"：基于后端返回的 recommendDate 是否等于今天
  */
-function applyRecommend(list, recIds) {
-  const arr = list.map(r => ({ ...r, _isRecommend: false }))
-  if (!recIds || recIds.length === 0) return arr
-
-  const idSet = new Set()
-  const recOrder = []
-
-  for (const recId of recIds) {
-    const idx = arr.findIndex(r => String(r.id) === String(recId))
-    if (idx !== -1) {
-      idSet.add(String(recId))
-      recOrder.push(String(recId))
-    }
-  }
-
-  // 清理不存在的推荐
-  for (const recId of recIds) {
-    if (!idSet.has(String(recId))) {
-      recommendUtil.removeRecommend(recId)
-    }
-  }
-
-  // 打标记
-  for (const r of arr) {
-    if (idSet.has(String(r.id))) {
-      r._isRecommend = true
-    }
-  }
-
-  if (recOrder.length === 0) return arr
-
-  // 多推荐全部置顶
-  const recommended = []
-  recOrder.forEach(rid => {
-    const idx = arr.findIndex(r => String(r.id) === rid)
-    if (idx !== -1) {
-      recommended.push(arr.splice(idx, 1)[0])
-    }
-  })
-  return recommended.concat(arr)
+function applyRecommend(list) {
+  const today = recommendUtil.getDateStr()
+  return (list || []).map(r => ({
+    ...r,
+    _isRecommend: r.recommendDate === today,
+  }))
 }
 
 function loadRecipes(cb) {
   loading.value = true
-  const recIds = recommendUtil.getTodayRecommendIds()
-
   recipeApi.getRecipes()
     .then(data => {
-      recipes.value = applyRecommend(data || [], recIds)
+      recipes.value = applyRecommend(data)
     })
     .catch(err => {
       console.error('[首页加载失败]', err)
@@ -184,24 +149,29 @@ function goDetail(id) {
   router.push(`/detail/${id}`)
 }
 
-function onToggleRecommend(item) {
+async function onToggleRecommend(item) {
   const id = String(item.id)
-  const result = recommendUtil.toggleRecommend(id)
+  ui.showLoading({ title: '处理中...' })
+  const res = await recommendUtil.toggleRecommend(id, auth.getAuth())
+  ui.hideLoading()
 
-  const recIds = recommendUtil.getTodayRecommendIds()
-  recipes.value = applyRecommend(
-    recipes.value.map(r => {
-      const o = { ...r }
-      delete o._isRecommend
-      return o
-    }),
-    recIds
-  )
+  if (res && res.code === 0) {
+    // 本地同步状态，无需重新拉列表
+    item._isRecommend = res.action === 'add'
+    // 推荐变更后重新排序：推荐置顶
+    recipes.value = applyRecommend(recipes.value)
+    // 重新应用：把已推荐的挪到前面
+    const recs = recipes.value
+    const recsTop = recs.filter(r => r._isRecommend)
+    const recsRest = recs.filter(r => !r._isRecommend)
+    recipes.value = recsTop.concat(recsRest)
 
-  if (result.action === 'add') {
-    ui.showToast({ title: '已加入今日推荐', icon: '✓' })
+    ui.showToast({
+      title: res.action === 'add' ? '已加入今日推荐' : '已取消推荐',
+      icon: res.action === 'add' ? '✓' : undefined,
+    })
   } else {
-    ui.showToast({ title: '已取消推荐' })
+    ui.showToast({ title: (res && res.msg) || '操作失败' })
   }
 }
 

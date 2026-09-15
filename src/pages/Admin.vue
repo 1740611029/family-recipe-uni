@@ -77,7 +77,6 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import recipeApi from '../utils/recipe.js'
 import auth from '../utils/auth.js'
-import recommendUtil from '../utils/recommend.js'
 import { ui } from '../utils/ui.js'
 
 const router = useRouter()
@@ -136,7 +135,6 @@ function doDelete(item) {
   }).then(res => {
     ui.hideLoading()
     if (res && res.code === 0) {
-      recommendUtil.clearIfMatches(targetId)
       ui.showToast({ title: '已删除', icon: '✓' })
       loadRecipes()
     } else {

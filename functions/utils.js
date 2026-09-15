@@ -33,6 +33,15 @@ export function formatDate(d) {
   return `${y}-${m}-${day} ${h}:${mi}:${s}`
 }
 
+// 格式化为日期字符串 YYYY-MM-DD（用于推荐日期）
+export function getDateStr(d) {
+  const date = d || new Date()
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 // 生成 UUID
 export function generateId() {
   return crypto.randomUUID()
@@ -48,6 +57,7 @@ export function rowToRecipe(row) {
     image: row.image || '',
     ingredients: row.ingredients ? JSON.parse(row.ingredients) : [],
     steps: row.steps ? JSON.parse(row.steps) : [],
+    recommendDate: row.recommendDate || '',
     createTime: row.createTime || '',
     updateTime: row.updateTime || '',
   }
