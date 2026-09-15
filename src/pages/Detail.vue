@@ -119,9 +119,13 @@ onMounted(() => {
 
 /* 返回栏 */
 .back-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   padding: 12px 16px;
   display: flex;
   align-items: center;
+  background: var(--bg-page);
 }
 .back-btn {
   display: flex;

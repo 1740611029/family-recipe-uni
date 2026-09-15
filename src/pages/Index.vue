@@ -156,11 +156,11 @@ async function onToggleRecommend(item) {
   ui.hideLoading()
 
   if (res && res.code === 0) {
-    // 本地同步状态，无需重新拉列表
-    item._isRecommend = res.action === 'add'
-    // 推荐变更后重新排序：推荐置顶
+    // 本地同步 recommendDate，applyRecommend 会基于此字段判断
+    const today = recommendUtil.getDateStr()
+    item.recommendDate = res.action === 'add' ? today : ''
+    // 重新应用推荐标记 + 排序：推荐置顶
     recipes.value = applyRecommend(recipes.value)
-    // 重新应用：把已推荐的挪到前面
     const recs = recipes.value
     const recsTop = recs.filter(r => r._isRecommend)
     const recsRest = recs.filter(r => !r._isRecommend)
@@ -193,7 +193,11 @@ onUnmounted(() => {
 
 /* 顶部标题 */
 .hero {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   padding: 30px 20px 15px;
+  background: var(--bg-page);
 }
 .hero-title {
   display: block;
@@ -211,9 +215,10 @@ onUnmounted(() => {
 
 /* 管理端隐藏入口 */
 .admin-entry {
-  position: absolute;
+  position: fixed;
   top: 28px;
   right: 20px;
+  z-index: 200;
   width: 36px;
   height: 36px;
   cursor: pointer;
