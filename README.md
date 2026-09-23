@@ -40,11 +40,13 @@
 │   ├── _routes.json            # Functions 路由配置
 │   ├── utils.js                # 后端工具函数
 │   └── api/
-│       ├── recipes.js          # GET /api/recipes（获取全部菜谱）
+│       ├── recipes.js          # GET /api/recipes（获取全部菜谱，不含图片本体）
 │       └── recipe/
-│           ├── [id].js         # GET /api/recipe/:id（获取单条）
+│           ├── [id].js         # GET /api/recipe/:id（获取单条，?raw=1 返回图片原图）
+│           ├── image/[id].js   # GET /api/recipe/image/:id（图片二进制，带 ETag）
 │           ├── save.js         # POST /api/recipe/save（新增/编辑）
-│           └── delete.js       # POST /api/recipe/delete（删除）
+│           ├── delete.js       # POST /api/recipe/delete（删除）
+│           └── recommend.js    # POST /api/recipe/recommend（设置今日推荐）
 ├── public/                     # 静态资源
 │   ├── favicon.svg
 │   └── _redirects              # SPA 路由重定向
@@ -127,11 +129,21 @@ npm run build
 
 ### 4. 部署到 Cloudflare Pages
 
-方式一：通过 Wrangler CLI 部署
+方式一：通过 Wrangler CLI 部署（推荐）
 
 ```bash
-npx wrangler pages deploy dist
+# 首次使用先登录
+npx wrangler login
+
+npm run build
+npx wrangler pages deploy dist --project-name family-cookbook --branch main --commit-dirty=true
 ```
+
+注意：
+
+- 必须带 `--branch main`，否则只会生成一个预览部署（`https://<hash>.family-cookbook-3y3.pages.dev`），生产域名不会更新
+- 部署输出里出现 `Uploading Functions bundle` 才说明 `functions/` 真的被打包上传了
+- **不要用直传 API（assets manifest）的方式部署**，它只上传静态资源、不带 Functions，`/api/*` 会全部失效。仓库里的 `deploy.cjs` 就是这种方式，已停用（其中的 refresh token 也已失效）
 
 方式二：通过 Git 集成
 
@@ -149,6 +161,18 @@ npx wrangler pages deploy dist
 与原版一致，首页右上角有一个隐藏的 🍴 图标，**长按 0.6 秒**进入管理端。
 
 管理员凭证：`admin / admin`（硬编码在 `functions/utils.js` 中）。
+
+## 性能约定（别改回去）
+
+图片以 base64 存在 D1 的 `recipes.image` 列，单张 100~250KB。因此：
+
+- `/api/recipes` 和 `/api/recipe/:id` **不返回图片本体**，`image` 字段是 `/api/recipe/image/:id` 地址，由浏览器按需加载（列表 3KB，详情 0.5KB）
+- 图片接口带 ETag，未修改时返回 304，几乎零传输
+- 编辑页要原图 base64 时用 `getRecipe(id, { raw: true })`，保存时原样回传
+- 保存接口会把 `/api/` 开头的 image 视为"未修改"，保持原图不被覆盖
+- 前端请求统一 30 秒超时，GET 失败自动重试 1 次
+
+如果哪天列表接口又变成 2MB，表现就是首页一直转圈、弱网直接 load fail。
 
 ## 与原 uni-app 版本的对应关系
 

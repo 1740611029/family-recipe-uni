@@ -33,20 +33,26 @@ export async function onRequestPost(context) {
   const cleanSteps = (steps || []).filter(s => s && s.trim())
   const now = formatDate(new Date())
 
+  // 图片字段可能是 /api/recipe/image/:id 展示地址（未修改图片时会原样回传），
+  // 这种情况不能当成图片内容写回数据库，否则图片就丢了
+  const safeImage = typeof image === 'string' && image.startsWith('/api/') ? '' : (image || '')
+
   try {
     if (id) {
-      // 更新
+      // 更新：图片传的是展示地址时保持原图不变
       await env.DB
         .prepare(`
           UPDATE recipes SET
-            name = ?, description = ?, image = ?,
+            name = ?, description = ?,
+            image = CASE WHEN ? = '' THEN image ELSE ? END,
             ingredients = ?, steps = ?, updateTime = ?
           WHERE id = ?
         `)
         .bind(
           String(name).trim(),
           description || '',
-          image || '',
+          safeImage,
+          safeImage,
           JSON.stringify(cleanIngredients),
           JSON.stringify(cleanSteps),
           now,

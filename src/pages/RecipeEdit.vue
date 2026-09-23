@@ -167,7 +167,8 @@ function goBack() {
 
 function loadRecipe(id) {
   loadingData.value = true
-  recipeApi.getRecipe(id)
+  // 编辑页要原图 base64（保存时会原样回传），所以带 raw=1
+  recipeApi.getRecipe(id, { raw: true })
     .then(data => {
       if (data) {
         image.value = data.image || ''
